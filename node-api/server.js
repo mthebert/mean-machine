@@ -140,7 +140,12 @@ apiRouter.route('/users/:user_id')
 			if(err) return res.send(err);
 			res.json({message: 'User successfully deleted'});
 		})
-	})
+	});
+
+// api endpoint to get user info
+apiRouter.get('/me', function(req, res){
+	res.send(req.decoded);
+})
 // middleware to use for all requests
 apiRouter.use(function(req, res, next){
 	var token = req.body.token || req.param('token') || req.headers['x-access-token'];
