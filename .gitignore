@@ -1,0 +1,10 @@
+code/
+node_modules/
+logs/*
+tmp
+.idea
+.DS_STORE
+!.gitkeep
+*.crt
+*.pem
+*.scr
