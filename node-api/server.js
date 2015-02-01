@@ -1,16 +1,18 @@
 // CALL THE PACKAGES
 // ============================
-var express = require('express');
-var app = express();
 var bodyParser = require('body-parser');
-var morgan = require('morgan');
+var express = require('express');
+var jwt = require('jsonwebtoken')
 var mongoose = require('mongoose');
+var morgan = require('morgan');
 var port = process.env.PORT  || 8080;
 
 // BASE SETUP
 // ============================
+var app = express();
 mongoose.connect('mongodb://node:noder@novus.modulusmongo.net:27017/Iganiq8o');
 var User = require('./app/models/user');
+var superSecret = "scotchscotchscotchilovescotch";
 
 // APP CONFIG
 // ============================
@@ -31,8 +33,6 @@ app.use(morgan('dev'));
 
 // ROUTES FOR OUR API
 // ============================
-// get an instance of express router
-var apiRouter = express.Router();
 
 // route middleware and first route here
 // basic route for the home page
@@ -40,6 +40,35 @@ app.get('/', function(req, res){
 	res.send('Welcome to the home page!');
 });
 
+// get an instance of express router
+var apiRouter = express.Router();
+
+// route to authenticate a user (POST http://localhost:8080/api/authenticate)
+apiRouter.post('/authenticate', function(req, res){
+	// find the user
+	// select the name username and password explicitly
+	User.findOne({username: req.body.username}).select('name username password').exec(function(err,user){
+		if(err) throw err;
+		// no user with that username was found
+		if(!user){
+			res.json({success: false, message: 'Authentication failed, user not found'});
+		}
+		else if(user){
+			// check if password matches
+			var validPassword = user.comparePassword(req.body.password);
+			if(!validPassword){
+				res.json({success: false, message: 'Authentication failed.  Wrong password'});
+			}
+			else{
+				// if user is found and password is right
+				// create token
+				var token = jwt.sign({name: user.name, username: user.username}, superSecret, {expiresInMinutes: 1440});
+				// return the info including token as json
+				res.json({succes: true, message: 'Enjoy your token!', token: token});
+			}
+		}
+	});
+});
 // routes that end in /users
 apiRouter.route('/users')
 	// create a user(accessed at POST http://localhost:8080/api/users)
@@ -114,12 +143,19 @@ apiRouter.route('/users/:user_id')
 	})
 // middleware to use for all requests
 apiRouter.use(function(req, res, next){
-	// do logging
-	console.log("someone just came to our app");
-	// we will ad more to the middleware later
-	// this is where we will authenticate users
-	next();  // make sure we go to the next routes and dont stop here
-})
+	var token = req.body.token || req.param('token') || req.headers['x-access-token'];
+	// decode token
+	if(token){
+		jwt.verify(token, superSecret, function(err, decoded){
+			if(err){
+				return res.status(403).send({success:false, message: 'Failed to authenticate token'});
+			} else {
+				req.decoded = decoded;
+				next();
+			}
+		});
+	}
+});
 
 // test route to make sure everything is working
 // accessed at GET http://localhost:8080/API
